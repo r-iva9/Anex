@@ -1,0 +1,14 @@
+[package]
+name = "r-iva9/anex"
+description = "Customizable state management for the Allure Ecosystem."
+license = "MIT"
+authors = ["r-iva9"]
+version = "1.0.0"
+
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+
+exclude = ["**"]
+include = ["src", "src/*", "default.project.json", "wally.lock", "wally.toml"]
+
+[dependencies]
