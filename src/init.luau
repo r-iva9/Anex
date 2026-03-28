@@ -5,7 +5,7 @@
 --[[
     ANEX: Customizable state management for the Allure Ecosystem
     By r-iva9
-    1.0.0
+    1.1.0
     Open source (MIT)
     https://github.com/r-iva9/Anex
 
@@ -27,7 +27,7 @@ type ffor<R...> = <A...>(A...) -> R...
 type with<A...> = <R...>(A...) -> R...
 type withself<T, A...> = <R...>(self: T, A...) -> R...
 
-type Hook<T=any> = {
+export type Hook<T=any> = {
 	--[=[
 		Call each connected function with the arguments `(self, value)`
 	]=]
@@ -163,7 +163,7 @@ end
 
 --- Returns `true` is the value is a State and `false` if not
 local function isstate(value: any): boolean
-	return typeof(value) == "table" and value.Val ~= nil and value.Connect and value.Fire and value.Setter
+	return (typeof(value) == "table" and value.Connect and value.Fire and value.Setter) and true or false
 end
 
 --- Returns a function that returns a state that displays an operation on the 2 specified states
@@ -192,6 +192,22 @@ local function withstate<T>(val: (State<T>) -> T):
 		end)
 		return new
 	end
+end
+
+--- Returns true if t1 is a subset of t2 and false if not
+local function matchsubset<K, V>(t1: table<K, V>, t2: table<K, V>): boolean
+	for k, v in t1 do
+		if t2[k] ~= v then return false end
+	end
+	return true
+end
+
+--- Returns true if t1 is an empty table and false if not
+local function isempty(t1: table): boolean
+	for _, __ in t1 do
+		return false
+	end
+	return true
 end
 
 ------------
@@ -243,6 +259,16 @@ Anex.Hook = function<S, T>(container: S, start: T): Hook<T>
 		table.insert(container, self)
 	end
 	return self
+end
+
+--- Returns `true` if the value is a State and `false` if it's not
+Anex.IsState = function(self, value: Stateable): boolean
+	return isstate(value)
+end
+
+--- If the `value` is a State, returns it, if not, returns a State with `value` as the initial value
+Anex.Statify = function<T>(self, value: State<T> | T): State<T>
+	return if isstate(value) then value else Anex:State(value)
 end
 
 local stateMt = {
@@ -367,5 +393,137 @@ Anex.State = function<S, T, A>(container: S, value: T, overhead: A?): State<T>
 
 	return setmetatable(self, stateMt)
 end :: StateConstructor
+
+--[[
+	Creates an Effect: a State dependant on other states, the value of which is calculated via a function
+
+	Effect is called in 2 steps, firstly pass the dependencies (the states that'll update the Effect), then the function that defines the Effect
+	```luau
+	local effect = Anex:Effect(stateA, stateB)(function()
+		return stateA() + stateB()
+	end)
+	```
+]]
+Anex.Effect = function<S, T...>(container: S, ...: T...): (callback: () -> any?) -> State
+	local states: table = {...}
+	return function(callback: () -> any?): State
+		local state: State = Anex.State(container, callback()) :: State
+		local f = function() 
+			state(callback())
+		end
+
+		for i, st: State in states do
+			st:Connect(f)
+		end
+
+		return state
+	end
+end
+
+--[[
+	Identical to Anex.Effect, however the results of the function are memoized and<br>will not be recalculated if they already were for the same inputs
+	```luau
+	local effect = Anex:EffectMemo(stateA, stateB)(function()
+		return stateA() + stateB()
+	end)
+	```
+]]
+Anex.EffectMemo = function<S, T...>(container: S, ...: T...): (callback: () -> any?) -> State
+	local states: table = {...}
+	local memo: { [{any}]: any } = {}
+
+	return function(callback: () -> any?): State
+		local val = callback()
+		local state: State = Anex.State(container, val) :: State
+
+		-- memoize the first item
+		local values = {}
+		for i, st: State in states do
+			values[i] = st()
+		end
+		memo[values] = val
+
+		local f = function(): any
+			local values = {}
+			local val = state()
+			for i, st: State in states do
+				values[i] = st()
+			end
+
+			for match, value in memo do
+				if matchsubset(values, match) then
+					if value == val then return val end
+					return state(value)
+				end
+			end
+
+			local res = callback()
+			memo[values] = res
+			return state(res)
+		end
+
+		for i, st: State in states do
+			st:Connect(f)
+		end
+
+		return state
+	end
+end
+
+--[[
+	Identical to Anex.Effect, however applies maximum optimization:
+	- The results are memoized and will not be calculated if they already were for the same inputs
+	- The Computed will only update if the value is needed: it's gotten or it has connections
+
+	However it will still always give you up-to-date values
+	```luau
+	local effect = Anex:Computed(stateA, stateB)(function()
+		return stateA() + stateB()
+	end)
+	```
+]]
+Anex.Computed = function<S, T...>(container: S, ...: T...): (callback: () -> any?) -> State
+	local states: table = {...}
+	local memo: { [{any}]: any } = {}
+
+	return function(callback: () -> any?): State
+		--Computed is initially nil
+		local state: State = Anex.State(container, nil) :: State
+
+		local f = function(): any
+			local values = {}
+			local val = state.Val
+			for i, st: State in states do
+				values[i] = st()
+			end
+
+			for match, value in memo do
+				if matchsubset(values, match) then
+					if value == val then return val end
+					return state(value)
+				end
+			end
+
+			local res = callback()
+			memo[values] = res
+			return state(res)
+		end
+
+		local forstates = function()
+			if isempty(state.Connections) then return end
+			f()
+		end
+
+		for i, st: State in states do
+			st:Connect(forstates)
+		end
+
+		state:Getter(function()
+			return f()
+		end)
+
+		return state
+	end
+end
 
 return Anex
