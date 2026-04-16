@@ -5,7 +5,6 @@
 --[[
     ANEX: Customizable state management for the Allure Ecosystem
     By r-iva9
-    1.1.0
     Open source (MIT)
     https://github.com/r-iva9/Anex
 
@@ -13,6 +12,7 @@
     By r-iva9
 	https://github.com/r-iva9/Allure
 ]]
+local VERSION = "1.1.0"
 
 ------------
 -- TYPES
@@ -49,7 +49,9 @@ export type Hook<T=any> = {
 		```
 		Where `fn` is a callback
 	]=]
-	Connect: (self: Hook<T>, name: any) -> (withself<Hook<T>, T>?) -> Hook<T>
+	Connect: (self: Hook<T>, name: any) -> (withself<Hook<T>, T>?) -> Hook<T>,
+
+	Destroy: (...any?) -> ()
 }
 
 export type State<T=any> = setmetatable<
@@ -215,7 +217,7 @@ end
 
 Anex = {
 	Name = "Anex",
-	Version = "1.0.0",
+	Version = VERSION,
 	Author = "r-iva9",
 
 	--- ALLURE
@@ -233,7 +235,8 @@ Anex = {
 	Hooks can `:Fire` all connected functions with one value
 ]=]
 Anex.Hook = function<S, T>(container: S, start: T): Hook<T>
-	local self = {
+	local self = nil :: never
+	self = {
 		Fire = function(self: Hook<T>, value: T): Hook<T>
 			for _, conn in self.Connections do
 				conn(self, value)
@@ -253,6 +256,10 @@ Anex.Hook = function<S, T>(container: S, start: T): Hook<T>
 				self.Connections[key or val] = val
 				return function(...) return self end
 			end
+		end,
+		Destroy = function(...)
+			table.clear(self)
+			self = nil :: never
 		end
 	}
 	if container ~= Anex then
@@ -318,9 +325,9 @@ local stateMt = {
 		return self() < other()
 	end,
 
-	__tostring = function(self: State): string
-		return tostring(self())
-	end,
+	--[[__tostring = function(self: State): string
+		return tostring(self:Get())
+	end,]]
 }
 
 --[=[
@@ -329,7 +336,7 @@ local stateMt = {
 	States are extensions of Hooks encapsulating a value, setter and getter.
 ]=]
 Anex.State = function<S, T, A>(container: S, value: T, overhead: A?): State<T>
-	local self = Anex:Hook(value) :: table
+	local self = Anex.Hook(container, value) :: table
 	self.Val = value
 
 	local deleter = function(...) end
@@ -363,6 +370,7 @@ Anex.State = function<S, T, A>(container: S, value: T, overhead: A?): State<T>
 
 		return setter(self, value)
 	end
+
 	self.Destroy = function<A..., R...>(...: A...): R...
 		deleter(...)
 
@@ -387,9 +395,9 @@ Anex.State = function<S, T, A>(container: S, value: T, overhead: A?): State<T>
 		return self
 	end
 
-	if container ~= Anex and typeof(container) == "table" then
-		table.insert(container, self)
-	end
+	--if container ~= Anex and typeof(container) == "table" then
+	--	table.insert(container, self)
+	--end
 
 	return setmetatable(self, stateMt)
 end :: StateConstructor
