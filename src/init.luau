@@ -165,7 +165,7 @@ end
 
 --- Returns `true` is the value is a State and `false` if not
 local function isstate(value: any): boolean
-	return (typeof(value) == "table" and value.Connect and value.Fire and value.Setter) and true or false
+	return (typeof(value) == "table" and rawget(value, "Connect") and rawget(value, "Fire") and rawget(value, "Setter")) and true or false
 end
 
 --- Returns a function that returns a state that displays an operation on the 2 specified states
@@ -269,8 +269,8 @@ Anex.Hook = function<S, T>(container: S, start: T): Hook<T>
 end
 
 --- Returns `true` if the value is a State and `false` if it's not
-Anex.IsState = function(self, value: Stateable): boolean
-	return isstate(value)
+Anex.IsState = function(self, value: Stateable?): boolean
+	return isstate(value or self)
 end
 
 --- If the `value` is a State, returns it, if not, returns a State with `value` as the initial value
