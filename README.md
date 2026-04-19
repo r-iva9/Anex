@@ -9,7 +9,7 @@
 ## 📦 Installation
 Install via wally:
 ```
-Anex = "r-iva9/anex@1.0.0"
+Anex = "r-iva9/anex@1.1.1"
 ```
 
 ## 🍀 Benefits
