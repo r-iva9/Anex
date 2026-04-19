@@ -3,7 +3,7 @@ name = "r-iva9/anex"
 description = "Customizable state management for Luau and the Allure Ecosystem."
 license = "MIT"
 authors = ["r-iva9"]
-version = "1.1.0"
+version = "1.1.1"
 
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
