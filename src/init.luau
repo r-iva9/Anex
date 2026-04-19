@@ -1,6 +1,5 @@
 --!strict
 --!optimize 2
---!native
 
 --[[
     ANEX: Customizable state management for the Allure Ecosystem
@@ -12,7 +11,7 @@
     By r-iva9
 	https://github.com/r-iva9/Allure
 ]]
-local VERSION = "1.1.0"
+const VERSION = table.freeze {major = 1, minor = 1, patch = 1, release = true}
 
 ------------
 -- TYPES
@@ -154,68 +153,9 @@ type HookConstructor = <S, T>(container: S, start: T) -> Hook<T>
 type StateConstructor = <S, T, A>(container: S, value: T, overhead: A?) -> State<T>
 
 ------------
--- UTILITY
+-- DEPENDENCIES
 
-local Anex = nil :: never
-
---- Returns a typesafe reference to `t`
-local function ref<T>(t: T): any
-	return t :: any
-end
-
---- Returns `true` is the value is a State and `false` if not
-local function isstate(value: any): boolean
-	return (typeof(value) == "table" and rawget(value, "Connect") and rawget(value, "Fire") and rawget(value, "Setter")) and true or false
-end
-
---- Returns a function that returns a state that displays an operation on the 2 specified states
-local function withstates(val: (Stateable, Stateable) -> any): 
-	(self: Stateable, other: Stateable) -> Stateable
-	return function(self: Stateable, other: Stateable): Stateable
-		local new = Anex:State(val(self, other))
-
-		local f = function(_, __)
-			new(val(self, other))
-		end
-		if isstate(self) then self:Connect(new)(f) end
-		if isstate(other) then other:Connect(new)(f) end
-		return new
-	end
-end
-
---- Returns a function that returns a state that displays an operation on the specified state
-local function withstate<T>(val: (State<T>) -> T): 
-	(self: State<T>) -> State<T>
-	return function(self: State<T>): State<T>
-		local new = Anex:State(val(self))
-
-		self:Connect(new)(function(_, __)
-			new(val(self))
-		end)
-		return new
-	end
-end
-
---- Returns true if t1 is a subset of t2 and false if not
-local function matchsubset<K, V>(t1: table<K, V>, t2: table<K, V>): boolean
-	for k, v in t1 do
-		if t2[k] ~= v then return false end
-	end
-	return true
-end
-
---- Returns true if t1 is an empty table and false if not
-local function isempty(t1: table): boolean
-	for _, __ in t1 do
-		return false
-	end
-	return true
-end
-
-------------
--- ANEX
-
-Anex = {
+const Anex = {
 	Name = "Anex",
 	Version = VERSION,
 	Author = "r-iva9",
@@ -228,6 +168,71 @@ Anex = {
 	Dependencies = {},
 	Instance = script,
 }
+
+------------
+-- UTILITY
+
+--- Returns a typesafe reference to `t`
+@native
+const function ref<T>(t: T): any
+	return t :: any
+end
+
+--- Returns `true` is the value is a State and `false` if not
+@native
+const function isstate(value: any): boolean
+	return (typeof(value) == "table" and rawget(value, "Connect") and rawget(value, "Fire") and rawget(value, "Setter")) and true or false
+end
+
+--- Returns a function that returns a state that displays an operation on the 2 specified states
+@native
+const function withstates(val: (Stateable, Stateable) -> any): 
+	(self: Stateable, other: Stateable) -> Stateable
+	return function(self: Stateable, other: Stateable): Stateable
+		const new = Anex:State(val(self, other))
+
+		const f = function(_, __)
+			new(val(self, other))
+		end
+		if isstate(self) then self:Connect(new)(f) end
+		if isstate(other) then other:Connect(new)(f) end
+		return new
+	end
+end
+
+--- Returns a function that returns a state that displays an operation on the specified state
+const function withstate<T>(val: (State<T>) -> T): 
+	(self: State<T>) -> State<T>
+	return function(self: State<T>): State<T>
+		const new = Anex:State(val(self))
+
+		self:Connect(new)(function(_, __)
+			new(val(self))
+		end)
+		return new
+	end
+end
+
+--- Returns true if t1 is a subset of t2 and false if not
+@native
+const function matchsubset<K, V>(t1: table<K, V>, t2: table<K, V>): boolean
+	for k, v in t1 do
+		if t2[k] ~= v then return false end
+	end
+	return true
+end
+
+--- Returns true if t1 is an empty table and false if not
+@native
+const function isempty(t1: table): boolean
+	for _, __ in t1 do
+		return false
+	end
+	return true
+end
+
+------------
+-- ANEX
 
 --[=[
 	Creates a new Hook object within the `container` table if it's not Anex
@@ -278,10 +283,10 @@ Anex.Statify = function<T>(self, value: State<T> | T): State<T>
 	return if isstate(value) then value else Anex:State(value)
 end
 
-local stateMt = {
+const stateMt = {
 	__isstateflag = true,
 	__call = function<T>(self: State<T>, ...: Stateable?): T
-		local i = select('#', ...)
+		const i = select('#', ...)
 	
 		return if i==0 then self:Get() else self:Set(... :: any)
 	end,
@@ -413,10 +418,10 @@ end :: StateConstructor
 	```
 ]]
 Anex.Effect = function<S, T...>(container: S, ...: T...): (callback: () -> any?) -> State
-	local states: table = {...}
+	const states: table = {...}
 	return function(callback: () -> any?): State
-		local state: State = Anex.State(container, callback()) :: State
-		local f = function() 
+		const state: State = Anex.State(container, callback()) :: State
+		const f = function() 
 			state(callback())
 		end
 
@@ -437,22 +442,22 @@ end
 	```
 ]]
 Anex.EffectMemo = function<S, T...>(container: S, ...: T...): (callback: () -> any?) -> State
-	local states: table = {...}
-	local memo: { [{any}]: any } = {}
+	const states: table = {...}
+	const memo: { [{any}]: any } = {}
 
 	return function(callback: () -> any?): State
-		local val = callback()
-		local state: State = Anex.State(container, val) :: State
+		const val = callback()
+		const state: State = Anex.State(container, val) :: State
 
 		-- memoize the first item
-		local values = {}
+		const values = {}
 		for i, st: State in states do
 			values[i] = st()
 		end
 		memo[values] = val
 
-		local f = function(): any
-			local values = {}
+		const f = function(): any
+			const values = {}
 			local val = state()
 			for i, st: State in states do
 				values[i] = st()
@@ -465,7 +470,7 @@ Anex.EffectMemo = function<S, T...>(container: S, ...: T...): (callback: () -> a
 				end
 			end
 
-			local res = callback()
+			const res = callback()
 			memo[values] = res
 			return state(res)
 		end
@@ -491,16 +496,16 @@ end
 	```
 ]]
 Anex.Computed = function<S, T...>(container: S, ...: T...): (callback: () -> any?) -> State
-	local states: table = {...}
-	local memo: { [{any}]: any } = {}
+	const states: table = {...}
+	const memo: { [{any}]: any } = {}
 
 	return function(callback: () -> any?): State
 		--Computed is initially nil
-		local state: State = Anex.State(container, nil) :: State
+		const state: State = Anex.State(container, nil) :: State
 
-		local f = function(): any
-			local values = {}
-			local val = state.Val
+		const f = function(): any
+			const values = {}
+			const val = state.Val
 			for i, st: State in states do
 				values[i] = st()
 			end
@@ -512,12 +517,12 @@ Anex.Computed = function<S, T...>(container: S, ...: T...): (callback: () -> any
 				end
 			end
 
-			local res = callback()
+			const res = callback()
 			memo[values] = res
 			return state(res)
 		end
 
-		local forstates = function()
+		const forstates = function()
 			if isempty(state.Connections) then return end
 			f()
 		end
@@ -534,4 +539,4 @@ Anex.Computed = function<S, T...>(container: S, ...: T...): (callback: () -> any
 	end
 end
 
-return Anex
+return table.freeze(Anex)
